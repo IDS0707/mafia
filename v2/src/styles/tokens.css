@@ -1,0 +1,78 @@
+/* ============================================================
+   DESIGN TOKENS — single source of truth
+   ============================================================ */
+
+:root {
+  /* ---- Colors ---- */
+  --bg:           #07090F;
+  --bg-2:         #0a0d16;
+  --surface:      #10141F;
+  --surface-2:    #131826;
+  --card:         #151A25;
+  --card-2:       #1a2030;
+
+  --line:         rgba(255, 255, 255, 0.06);
+  --line-2:       rgba(255, 255, 255, 0.12);
+  --line-3:       rgba(255, 255, 255, 0.2);
+
+  --red:          #FF3B3B;
+  --red-2:        #e02b2b;
+  --red-deep:     #8a0e0e;
+  --gold:         #D4A017;
+  --gold-2:       #fde08a;
+  --violet:       #7A5CFF;
+  --violet-2:     #a78bff;
+  --green:        #2ecc71;
+  --blue:         #4ab0ff;
+  --pink:         #ff5a96;
+
+  --text:         #F5F7FA;
+  --text-2:       #9AA4B2;
+  --text-3:       #5e6776;
+
+  /* ---- Radii ---- */
+  --r-sm:         8px;
+  --r-md:         14px;
+  --r-lg:         20px;
+  --r-xl:         28px;
+  --r-pill:       999px;
+
+  /* ---- Shadows ---- */
+  --shadow-sm:    0 4px 14px rgba(0, 0, 0, 0.4);
+  --shadow-md:    0 10px 30px rgba(0, 0, 0, 0.5);
+  --shadow-lg:    0 24px 60px rgba(0, 0, 0, 0.55);
+  --glow-red:     0 0 28px rgba(255, 59, 59, 0.35);
+  --glow-gold:    0 0 28px rgba(212, 160, 23, 0.35);
+  --glow-violet:  0 0 28px rgba(122, 92, 255, 0.35);
+
+  /* ---- Motion ---- */
+  --t-instant:    100ms cubic-bezier(.2,.8,.2,1);
+  --t-fast:       180ms cubic-bezier(.2,.8,.2,1);
+  --t-mid:        320ms cubic-bezier(.2,.8,.2,1);
+  --t-slow:       600ms cubic-bezier(.2,.8,.2,1);
+
+  /* ---- Typography ---- */
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display: 'Bebas Neue', sans-serif;
+
+  /* ---- Layout ---- */
+  --pad-x:        clamp(20px, 4vw, 40px);
+  --sidebar-w:    240px;
+  --topbar-h:     68px;
+
+  /* ---- Z-index ladder ---- */
+  --z-base:       1;
+  --z-sticky:     30;
+  --z-topbar:     40;
+  --z-sidebar:    45;
+  --z-modal-bg:   200;
+  --z-modal:      210;
+  --z-toast:      300;
+  --z-splash:     1000;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-w: 72px;
+  }
+}
