@@ -96,7 +96,8 @@ function makeNewUser({ name, email }) {
    ============================================================ */
 function showView(name) {
   $$('.view').forEach(v => v.hidden = (v.dataset.view !== name));
-  $$('.topnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === name));
+  // Highlight nav item — sidebar uses .side-nav, legacy uses .topnav
+  $$('.topnav a, .side-nav a').forEach(a => a.classList.toggle('active', a.dataset.nav === name));
   window.scrollTo(0, 0);
   if (name === 'menu') refreshMenu();
   if (name === 'profile') refreshProfile();
@@ -452,26 +453,57 @@ function enterLobby() {
   $('#lobbyMode').textContent = t('create.' + room.mode);
   $('#lobbyTime').textContent = room.time + 's';
   $('#lobbyVis').textContent = t('create.' + room.vis);
+
+  // Show host-only auto-fill toggle
+  const me = room.players.find(p => p.id === 'me');
+  const toggleWrap = $('#lobbyBotsToggle');
+  const cb = $('#cbAutoFill');
+  if (toggleWrap && cb && me?.isHost) {
+    toggleWrap.hidden = false;
+    cb.checked = room.autoFill !== false;
+    if (!cb._wired) {
+      cb._wired = true;
+      cb.addEventListener('change', () => {
+        room.autoFill = cb.checked;
+        if (cb.checked) scheduleBotJoins();
+        else stopBotJoins();
+        showToast(cb.checked ? t('create.botsHint') : t('create.noBotsHint'));
+      });
+    }
+  } else if (toggleWrap) {
+    toggleWrap.hidden = true;
+  }
+
   renderLobby();
-  // Auto-fill bots over time only if room.autoFill is enabled (default true)
   if (room.autoFill !== false) {
     scheduleBotJoins();
+  }
+}
+
+// Track lobby bot-fill interval separately so we can stop it on toggle
+let botJoinIv = null;
+function stopBotJoins() {
+  if (botJoinIv) {
+    clearInterval(botJoinIv);
+    botJoinIv = null;
   }
 }
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 function scheduleBotJoins() {
-  // Every 1.2 - 2.5s, add a bot until full
-  const iv = setInterval(() => {
-    if (!room || room.players.length >= room.max) {
-      clearInterval(iv);
+  // Don't double-schedule
+  stopBotJoins();
+  // Respect autoFill toggle
+  if (room && room.autoFill === false) return;
+  botJoinIv = setInterval(() => {
+    if (!room || room.autoFill === false || room.players.length >= room.max) {
+      stopBotJoins();
       return;
     }
     const bot = makeBotPlayer();
     bot.ready = Math.random() > 0.5;
     room.players.push(bot);
     renderLobby();
-    // Bots toggle ready over time
     setTimeout(() => {
       if (room && room.players.includes(bot)) {
         bot.ready = true;
@@ -479,7 +511,7 @@ function scheduleBotJoins() {
       }
     }, 1500 + rand(2500));
   }, 1200 + rand(1300));
-  timers.push(iv);
+  timers.push(botJoinIv);
 }
 
 function renderLobby() {
@@ -1302,6 +1334,104 @@ function runTimer(seconds, earlyEndCheck) {
     }, 1000);
     timers.push(iv);
   });
+}
+
+/* ============================================================
+   INBOX / NOTIFICATIONS — simple modal with seeded entries
+   ============================================================ */
+const INBOX_READ_KEY = 'mafia_inbox_read_v1';
+
+function loadInbox() {
+  // Seeded messages — would come from backend in real app
+  return {
+    mail: [
+      { id: 'm1', from: 'Mafia Studios', subj: 'Welcome to MAFIA',  ts: '2026-05-20', body: 'Thanks for joining! Daily reward awaits in the menu.', icon: '✉' },
+      { id: 'm2', from: 'Don_Carlo',     subj: 'Good game last night', ts: '2026-05-25', body: 'You played well. See you in the next match.', icon: '✉' },
+      { id: 'm3', from: 'Tournament',    subj: 'Mafia Cup 2026',     ts: '2026-05-26', body: 'Qualifiers open August 4. Prize pool: $5,000.', icon: '🏆' },
+    ],
+    bell: [
+      { id: 'n1', from: 'System', subj: 'Daily reward ready',    ts: 'just now',     body: 'Claim your 500 ⬢ + 25 ◆ in the menu.', icon: '⚡' },
+      { id: 'n2', from: 'Friend', subj: 'Azik_05 is online',     ts: '2 min ago',    body: 'Send an invite to play together.', icon: '●' },
+      { id: 'n3', from: 'Shop',   subj: 'New skin: Phantom',     ts: 'today',        body: 'Now available in the Skins tab.', icon: '✦' },
+    ],
+  };
+}
+
+function getReadIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(INBOX_READ_KEY) || '[]')); } catch { return new Set(); }
+}
+function setReadIds(set) {
+  localStorage.setItem(INBOX_READ_KEY, JSON.stringify([...set]));
+}
+
+function openInbox(tab = 'mail') {
+  const data = loadInbox();
+  const read = getReadIds();
+  let modal = $('#modalInbox');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modalInbox';
+    modal.className = 'modal';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+      if (e.target.matches('[data-close]')) modal.hidden = true;
+      const tabBtn = e.target.closest('[data-inbox-tab]');
+      if (tabBtn) {
+        const t = tabBtn.dataset.inboxTab;
+        modal._tab = t;
+        renderInboxBody();
+      }
+      const row = e.target.closest('[data-inbox-id]');
+      if (row) {
+        const id = row.dataset.inboxId;
+        const r = getReadIds();
+        r.add(id);
+        setReadIds(r);
+        row.classList.remove('unread');
+      }
+    });
+  }
+  modal._tab = tab;
+  renderInboxBody();
+  modal.hidden = false;
+
+  function renderInboxBody() {
+    const active = modal._tab || 'mail';
+    const list = data[active] || [];
+    const r = getReadIds();
+    modal.innerHTML = `
+      <div class="modal-bg" data-close></div>
+      <div class="modal-card inbox-modal">
+        <div class="inbox-head">
+          <h3>${active === 'mail' ? t('inbox.mail') : t('inbox.notifications')}</h3>
+          <button class="inbox-close" data-close>×</button>
+        </div>
+        <div class="inbox-tabs">
+          <button class="${active === 'mail' ? 'on' : ''}" data-inbox-tab="mail">
+            ${t('inbox.mail')} <span class="badge">${data.mail.filter(m => !r.has(m.id)).length}</span>
+          </button>
+          <button class="${active === 'bell' ? 'on' : ''}" data-inbox-tab="bell">
+            ${t('inbox.notifications')} <span class="badge">${data.bell.filter(m => !r.has(m.id)).length}</span>
+          </button>
+        </div>
+        <div class="inbox-list">
+          ${list.length === 0 ? `<div class="inbox-empty">${t('inbox.empty')}</div>` : list.map(m => `
+            <div class="inbox-row ${r.has(m.id) ? '' : 'unread'}" data-inbox-id="${m.id}">
+              <div class="ir-icon">${m.icon}</div>
+              <div class="ir-body">
+                <div class="ir-head">
+                  <span class="ir-from">${escapeHtml(m.from)}</span>
+                  <span class="ir-ts">${m.ts}</span>
+                </div>
+                <div class="ir-subj">${escapeHtml(m.subj)}</div>
+                <div class="ir-text">${escapeHtml(m.body)}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
 }
 
 /* ============================================================
@@ -2338,6 +2468,12 @@ function init() {
   $('#btnLogout').addEventListener('click', () => {
     if (confirm(t('nav.logout'))) logout();
   });
+
+  // Inbox + Notifications panel
+  const btnMail = $('#btnMail');
+  const btnBell = $('#btnBell');
+  if (btnMail) btnMail.addEventListener('click', () => openInbox('mail'));
+  if (btnBell) btnBell.addEventListener('click', () => openInbox('bell'));
 
   // Menu actions (data-action and data-nav buttons)
   document.addEventListener('click', (e) => {

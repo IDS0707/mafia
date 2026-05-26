@@ -3,6 +3,8 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
+  // GitHub Pages serves at /mafia/, v2 lives at /mafia/v2/
+  base: process.env.DEPLOY_TARGET === 'gh-pages' ? '/mafia/v2/' : '/',
   plugins: [svelte()],
   resolve: {
     alias: {

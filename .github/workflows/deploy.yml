@@ -1,0 +1,86 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, but don't cancel in-progress runs.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: v2/package-lock.json
+
+      - name: Install v2 dependencies
+        working-directory: ./v2
+        run: npm ci
+
+      - name: Build v2 (Vite + Svelte + TS)
+        working-directory: ./v2
+        env:
+          DEPLOY_TARGET: gh-pages
+        run: npm run build
+
+      - name: Assemble deploy folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public
+
+          # ---- OLD vanilla game at site root ----
+          cp index.html app.js styles.css i18n.js public/
+
+          # ---- V2 (Vite build) at /v2/ ----
+          mkdir -p public/v2
+          cp -r v2/dist/. public/v2/
+
+          # ---- Landing redirect: open the OLD game by default ----
+          # (root index.html already serves it; no extra file needed)
+
+          # ---- Disable Jekyll processing on GitHub Pages ----
+          touch public/.nojekyll
+
+          # ---- 404 fallback (optional but nice) ----
+          cp public/index.html public/404.html
+
+          echo "Built tree:"
+          ls -la public
+          echo "v2 tree:"
+          ls -la public/v2
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
